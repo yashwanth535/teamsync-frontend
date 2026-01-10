@@ -25,49 +25,80 @@ import {
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 import {
-  fetchTasks,
   createTask,
   updateTask,
   deleteTask,
 } from "../../store/slices/taskSlice";
 import { fetchProjects } from "../../store/slices/projectSlice";
+import axios from "../../utils/axios";
 
 const Tasks = () => {
   const dispatch = useDispatch();
-  const { tasks, loading } = useSelector((state) => state.tasks);
+  const tasksState = useSelector((state) => state.tasks);
   const { projects } = useSelector((state) => state.projects);
+  const tasks = tasksState?.tasks || [];
+  const loading = tasksState?.loading || false;
 
   const [openDialog, setOpenDialog] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [allTasks, setAllTasks] = useState([]);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    status: "pending",
+    status: "todo",
     priority: "medium",
     projectId: "",
     assignedTo: "",
     dueDate: "",
   });
 
-  // Group tasks by status
-  const groupedTasks = tasks.reduce((acc, task) => {
-    if (!acc[task.status]) {
-      acc[task.status] = [];
+  // Load all tasks from all projects
+  const loadAllTasks = async () => {
+    try {
+      const allProjectsTasks = [];
+      for (const project of projects) {
+        try {
+          const taskResponse = await axios.get(`/tasks/project/${project._id}`);
+          if (taskResponse.data) {
+            allProjectsTasks.push(...taskResponse.data);
+          }
+        } catch (err) {
+          console.error(`Error fetching tasks for project ${project._id}:`, err);
+        }
+      }
+      setAllTasks(allProjectsTasks);
+    } catch (error) {
+      console.error("Error loading tasks:", error);
+      setAllTasks([]);
     }
-    acc[task.status].push(task);
+  };
+
+  useEffect(() => {
+    dispatch(fetchProjects());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      loadAllTasks();
+    }
+  }, [projects]);
+
+  // Group tasks by status
+  const groupedTasks = allTasks.reduce((acc, task) => {
+    const status = task.status || "todo";
+    if (!acc[status]) {
+      acc[status] = [];
+    }
+    acc[status].push(task);
     return acc;
   }, {});
 
   const statusColumns = {
-    pending: { title: "Pending", color: "#ffd700" },
-    "in-progress": { title: "In Progress", color: "#ffa500" },
-    completed: { title: "Completed", color: "#90ee90" },
+    todo: { title: "To Do", color: "#e3f2fd" },
+    in_progress: { title: "In Progress", color: "#fff3e0" },
+    review: { title: "Review", color: "#f3e5f5" },
+    done: { title: "Done", color: "#e8f5e9" },
   };
-
-  useEffect(() => {
-    dispatch(fetchTasks());
-    dispatch(fetchProjects());
-  }, [dispatch]);
 
   const handleOpenDialog = (task = null) => {
     if (task) {
@@ -77,16 +108,16 @@ const Tasks = () => {
         description: task.description,
         status: task.status,
         priority: task.priority,
-        projectId: task.projectId,
-        assignedTo: task.assignedTo,
-        dueDate: task.dueDate,
+        projectId: task.project?._id || task.project || "",
+        assignedTo: task.assignedTo?._id || task.assignedTo || "",
+        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "",
       });
     } else {
       setEditingTask(null);
       setFormData({
         title: "",
         description: "",
-        status: "pending",
+        status: "todo",
         priority: "medium",
         projectId: "",
         assignedTo: "",
@@ -103,17 +134,27 @@ const Tasks = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingTask) {
-      await dispatch(updateTask({ id: editingTask._id, ...formData }));
-    } else {
-      await dispatch(createTask(formData));
+    try {
+      if (editingTask) {
+        await dispatch(updateTask({ id: editingTask._id, ...formData })).unwrap();
+      } else {
+        await dispatch(createTask(formData)).unwrap();
+      }
+      handleCloseDialog();
+      loadAllTasks(); // Reload tasks after create/update
+    } catch (error) {
+      console.error("Error saving task:", error);
     }
-    handleCloseDialog();
   };
 
   const handleDelete = async (taskId) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
-      await dispatch(deleteTask(taskId));
+      try {
+        await dispatch(deleteTask(taskId)).unwrap();
+        loadAllTasks(); // Reload tasks after delete
+      } catch (error) {
+        console.error("Error deleting task:", error);
+      }
     }
   };
 
@@ -129,15 +170,20 @@ const Tasks = () => {
       return;
     }
 
-    const task = tasks.find((t) => t._id === draggableId);
+    const task = allTasks.find((t) => t._id === draggableId);
     if (task) {
-      await dispatch(
-        updateTask({
-          id: task._id,
-          ...task,
-          status: destination.droppableId,
-        })
-      );
+      try {
+        await dispatch(
+          updateTask({
+            id: task._id,
+            ...task,
+            status: destination.droppableId,
+          })
+        ).unwrap();
+        loadAllTasks(); // Reload tasks after status update
+      } catch (error) {
+        console.error("Error updating task status:", error);
+      }
     }
   };
 
@@ -273,9 +319,10 @@ const Tasks = () => {
             }
             margin="normal"
           >
-            <MenuItem value="pending">Pending</MenuItem>
-            <MenuItem value="in-progress">In Progress</MenuItem>
-            <MenuItem value="completed">Completed</MenuItem>
+            <MenuItem value="todo">To Do</MenuItem>
+            <MenuItem value="in_progress">In Progress</MenuItem>
+            <MenuItem value="review">Review</MenuItem>
+            <MenuItem value="done">Done</MenuItem>
           </Select>
           <Select
             fullWidth

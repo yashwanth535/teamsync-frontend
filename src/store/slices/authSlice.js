@@ -77,6 +77,9 @@ export const updateProfile = createAsyncThunk(
   async (profileData, { rejectWithValue }) => {
     try {
       const response = await axios.put("/auth/profile", profileData);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -113,7 +116,7 @@ const initialState = {
   token: localStorage.getItem("token"),
   refreshToken: localStorage.getItem("refreshToken"),
   isAuthenticated: false,
-  loading: false,
+  loading: true,
   error: null,
   isMenuOpen: false,
 };
@@ -210,6 +213,21 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         state.token = null;
+        state.error = action.payload;
+      })
+      // Update Profile
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          state.user = { ...state.user, ...action.payload };
+        }
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
         state.error = action.payload;
       })
       // Refresh Token

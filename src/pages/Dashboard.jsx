@@ -156,6 +156,7 @@ const Dashboard = () => {
   const { stats, recentProjects, recentActivities, upcomingEvents, loading } = useSelector((state) => state.dashboard);
 
   useEffect(() => {
+    console.log("fetching dashboard data");
     dispatch(fetchDashboardData());
   }, [dispatch]);
 
@@ -329,7 +330,10 @@ const Dashboard = () => {
           <Grid container spacing={3}>
             {recentProjects.map((project) => (
               <Grid item xs={12} sm={6} md={4} key={project.id}>
-                <StyledCard>
+                <StyledCard
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                >
                   <CardContent>
                     <Box
                       display="flex"

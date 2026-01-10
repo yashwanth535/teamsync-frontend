@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Box,
@@ -14,10 +14,13 @@ import {
 } from "@mui/material";
 import { createTask } from "../../store/slices/taskSlice";
 import { fetchProjects } from "../../store/slices/projectSlice";
+import axios from "../../utils/axios";
 
 const CreateTask = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
+  const projectParam = searchParams.get("project");
   const { loading: projectsLoading, error: projectsError, projects } = useSelector(
     (state) => state.projects
   );
@@ -30,17 +33,37 @@ const CreateTask = () => {
     status: "todo",
     priority: "medium",
     dueDate: "",
-    projectId: "",
+    project: projectParam || "",
+    team: "",
   });
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     dispatch(fetchProjects());
-  }, [dispatch]);
+    loadTeams();
+    if (projectParam) {
+      setFormData(prev => ({ ...prev, project: projectParam }));
+    }
+  }, [dispatch, projectParam]);
+
+  const loadTeams = async () => {
+    try {
+      const response = await axios.get("/team");
+      setTeams(response.data || []);
+    } catch (error) {
+      console.error("Error loading teams:", error);
+      setTeams([]);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     await dispatch(createTask(formData));
-    navigate("/tasks");
+    if (projectParam) {
+      navigate(`/projects/${projectParam}`);
+    } else {
+      navigate("/tasks");
+    }
   };
 
   if (projectsLoading) {
@@ -154,16 +177,35 @@ const CreateTask = () => {
                 fullWidth
                 select
                 label="Project"
-                name="projectId"
-                value={formData.projectId}
+                name="project"
+                value={formData.project}
                 onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
+                  setFormData({ ...formData, project: e.target.value })
                 }
                 required
               >
                 {projects?.map((project) => (
                   <MenuItem key={project._id} value={project._id}>
                     {project.title}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                select
+                label="Team (Optional)"
+                name="team"
+                value={formData.team}
+                onChange={(e) =>
+                  setFormData({ ...formData, team: e.target.value })
+                }
+              >
+                <MenuItem value="">No Team</MenuItem>
+                {teams.map((team) => (
+                  <MenuItem key={team._id} value={team._id}>
+                    {team.name}
                   </MenuItem>
                 ))}
               </TextField>

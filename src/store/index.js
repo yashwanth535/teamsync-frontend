@@ -5,6 +5,7 @@ import axiosInstance from "../utils/axios";
 // Import reducers
 import authReducer from "./slices/authSlice";
 import projectReducer from "./slices/projectSlice";
+import taskReducer from "./slices/taskSlice";
 import teamReducer from "./slices/teamSlice";
 import messageReducer from "./slices/messageSlice";
 import dashboardReducer from "./slices/dashboardSlice";
@@ -15,6 +16,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     projects: projectReducer,
+    tasks: taskReducer,
     team: teamReducer,
     messages: messageReducer,
     dashboard: dashboardReducer,

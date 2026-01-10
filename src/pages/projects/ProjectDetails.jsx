@@ -39,6 +39,11 @@ import {
   Close as CloseIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  Assignment as TaskIcon,
+  ViewKanban as KanbanIcon,
+  Timeline as GanttIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as RadioButtonUncheckedIcon,
 } from "@mui/icons-material";
 import {
   fetchProjectById,
@@ -48,6 +53,9 @@ import {
   removeTeamFromProject,
 } from "../../store/slices/projectSlice";
 import { loadUser, refreshToken } from "../../store/slices/authSlice";
+import { updateTask } from "../../store/slices/taskSlice";
+import getSocket from "../../utils/socket";
+import axios from "../../utils/axios";
 
 const ProjectDetails = () => {
   const { projectId } = useParams();
@@ -72,6 +80,9 @@ const ProjectDetails = () => {
     message: "",
     severity: "success",
   });
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -115,8 +126,90 @@ const ProjectDetails = () => {
         description: currentProject.description || "",
         status: currentProject.status || "",
       });
+      loadTasks();
     }
   }, [currentProject]);
+
+  useEffect(() => {
+    if (projectId && user) {
+      const socket = getSocket();
+      
+      // Join project room for presence
+      socket.emit("join-project", {
+        projectId,
+        userId: user._id || user.id,
+        userName: user.name || user.email,
+      });
+
+      // Listen for active users
+      socket.on("user-joined", (data) => {
+        setActiveUsers(data.activeUsers || []);
+      });
+
+      socket.on("user-left", (data) => {
+        setActiveUsers(data.activeUsers || []);
+      });
+
+      socket.on("active-users", (data) => {
+        if (data.projectId === projectId) {
+          setActiveUsers(data.users || []);
+        }
+      });
+
+      // Get initial active users
+      socket.emit("get-active-users", { projectId });
+
+      return () => {
+        socket.emit("leave-project", {
+          projectId,
+          userId: user._id || user.id,
+        });
+        socket.off("user-joined");
+        socket.off("user-left");
+        socket.off("active-users");
+      };
+    }
+  }, [projectId, user]);
+
+  const loadTasks = async () => {
+    if (!projectId) return;
+    setLoadingTasks(true);
+    try {
+      const response = await axios.get(`/tasks/project/${projectId}`);
+      setTasks(response.data || []);
+    } catch (error) {
+      console.error("Error loading tasks:", error);
+      setTasks([]);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    try {
+      const task = tasks.find(t => t._id === taskId);
+      if (!task) return;
+
+      await dispatch(updateTask({
+        id: taskId,
+        ...task,
+        status: newStatus,
+      })).unwrap();
+      
+      loadTasks();
+      setSnackbar({
+        open: true,
+        message: "Task updated successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.message || "Failed to update task",
+        severity: "error",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -258,27 +351,42 @@ const ProjectDetails = () => {
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">{currentProject.title}</Typography>
-        {user?._id === currentProject.owner?._id && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<EditIcon />}
-              onClick={() => setEditDialogOpen(true)}
-              sx={{ mr: 1 }}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={handleDeleteProject}
-            >
-              Delete
-            </Button>
-          </Box>
-        )}
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<KanbanIcon />}
+            onClick={() => navigate(`/projects/${projectId}/kanban`)}
+          >
+            Tasks Kanban
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<GanttIcon />}
+            onClick={() => navigate(`/projects/${projectId}/gantt`)}
+          >
+            Tasks Gantt
+          </Button>
+          {user?._id === currentProject.owner?._id && (
+            <>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<EditIcon />}
+                onClick={() => setEditDialogOpen(true)}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={handleDeleteProject}
+              >
+                Delete
+              </Button>
+            </>
+          )}
+        </Box>
       </Box>
 
       <Grid container spacing={3}>
@@ -337,9 +445,124 @@ const ProjectDetails = () => {
               )}
             </List>
           </Paper>
+
+          <Paper sx={{ p: 3 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Tasks</Typography>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => navigate(`/tasks/create?project=${projectId}`)}
+              >
+                Add Task
+              </Button>
+            </Box>
+            {loadingTasks ? (
+              <Box display="flex" justifyContent="center" p={2}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : tasks.length > 0 ? (
+              <List>
+                {tasks.map((task) => (
+                  <ListItem
+                    key={task._id}
+                    secondaryAction={
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                        <Chip
+                          label={task.status}
+                          size="small"
+                          color={
+                            task.status === "done"
+                              ? "success"
+                              : task.status === "in_progress"
+                              ? "warning"
+                              : "default"
+                          }
+                        />
+                        {task.status !== "done" && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleUpdateTaskStatus(task._id, "done")}
+                            title="Mark as completed"
+                          >
+                            <CheckCircleIcon color="success" />
+                          </IconButton>
+                        )}
+                        <IconButton
+                          size="small"
+                          onClick={() => navigate(`/tasks/${task._id}`)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    }
+                  >
+                    <ListItemAvatar>
+                      <Avatar sx={{ bgcolor: "secondary.main" }}>
+                        <TaskIcon />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={task.title}
+                      secondary={
+                        <Box>
+                          <Typography variant="caption" display="block">
+                            {task.description || "No description"}
+                          </Typography>
+                          {task.dueDate && (
+                            <Typography variant="caption" color="text.secondary">
+                              Due: {new Date(task.dueDate).toLocaleDateString()}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
+                No tasks yet. Create one to get started!
+              </Typography>
+            )}
+          </Paper>
         </Grid>
 
         <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Active Users
+            </Typography>
+            {activeUsers.length > 0 ? (
+              <List dense>
+                {activeUsers.map((activeUser) => (
+                  <ListItem key={activeUser.userId}>
+                    <ListItemAvatar>
+                      <Avatar sx={{ bgcolor: "primary.main" }}>
+                        {activeUser.userName?.charAt(0)?.toUpperCase() || "U"}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={activeUser.userName}
+                      secondary="Online"
+                    />
+                    <Chip
+                      label="Active"
+                      color="success"
+                      size="small"
+                      sx={{ ml: 1 }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No active users
+              </Typography>
+            )}
+          </Paper>
+
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
               Project Details

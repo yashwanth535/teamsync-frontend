@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,19 +11,44 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  TextField,
+  InputAdornment,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { 
+  Add as AddIcon, 
+  Search as SearchIcon,
+  ViewKanban as KanbanIcon,
+} from "@mui/icons-material";
 import { fetchProjects } from "../../store/slices/projectSlice";
+import ProjectsKanban from "./ProjectsKanban";
 
 const Projects = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { projects, loading, error } = useSelector((state) => state.projects);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [showKanban, setShowKanban] = useState(true);
+
   useEffect(() => {
     console.log("Fetching projects...");
     dispatch(fetchProjects());
   }, [dispatch]);
+
+  const filteredProjects = projects?.filter((project) => {
+    const matchesSearch = 
+      project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  }) || [];
 
   if (loading) {
     return (
@@ -46,8 +71,6 @@ const Projects = () => {
     );
   }
 
-  console.log("Projects in component:", projects);
-
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -62,18 +85,98 @@ const Projects = () => {
         </Button>
       </Box>
 
-      {projects?.length === 0 ? (
+      {/* Kanban Board Section */}
+      {showKanban && projects?.length > 0 && (
+        <Box mb={4}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h5">Projects Kanban</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setShowKanban(false)}
+            >
+              Hide Kanban
+            </Button>
+          </Box>
+          <ProjectsKanban />
+        </Box>
+      )}
+
+      {!showKanban && (
+        <Button
+          variant="outlined"
+          startIcon={<KanbanIcon />}
+          onClick={() => setShowKanban(true)}
+          sx={{ mb: 3 }}
+        >
+          Show Kanban
+        </Button>
+      )}
+
+      {/* Filters and Project List */}
+      <Box mb={3}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h5">All Projects</Typography>
+        </Box>
+        
+        <Box display="flex" gap={2} mb={3}>
+          <TextField
+            placeholder="Search projects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ flexGrow: 1, maxWidth: 400 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              label="Status"
+            >
+              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="archived">Archived</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      </Box>
+
+      {filteredProjects.length === 0 ? (
         <Box textAlign="center" py={5}>
           <Typography variant="h6" gutterBottom>
-            No Projects Yet
+            {searchTerm || statusFilter !== "all" 
+              ? "No Projects Match Your Filters" 
+              : "No Projects Yet"}
           </Typography>
           <Typography color="text.secondary" paragraph>
-            Create your first project to get started
+            {searchTerm || statusFilter !== "all"
+              ? "Try adjusting your search or filters"
+              : "Create your first project to get started"}
           </Typography>
+          {!searchTerm && statusFilter === "all" && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => navigate("/projects/create")}
+              sx={{ mt: 2 }}
+            >
+              Create Project
+            </Button>
+          )}
         </Box>
       ) : (
         <Grid container spacing={3}>
-          {projects?.map((project) => (
+          {filteredProjects.map((project) => (
             <Grid item xs={12} sm={6} md={4} key={project._id}>
               <Card 
                 sx={{ 
