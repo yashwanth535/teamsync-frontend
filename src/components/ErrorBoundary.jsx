@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, Button, Box } from "@mui/material";
+import { Box, Typography, Button, Alert } from "@mui/material";
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,29 +15,35 @@ class ErrorBoundary extends React.Component {
     console.error("Error caught by boundary:", error, errorInfo);
   }
 
-  handleReset = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.href = "/";
-  };
-
   render() {
     if (this.state.hasError) {
       return (
         <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="100vh"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "100vh",
+            p: 3,
+          }}
         >
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={this.handleReset}>
-                Reset App
-              </Button>
-            }
-          >
-            Something went wrong. Please try again.
+          <Alert severity="error" sx={{ mb: 2, maxWidth: 600 }}>
+            <Typography variant="h6" gutterBottom>
+              Something went wrong
+            </Typography>
+            <Typography variant="body2" paragraph>
+              {this.state.error?.message || "An unexpected error occurred"}
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.href = "/dashboard";
+              }}
+            >
+              Go to Dashboard
+            </Button>
           </Alert>
         </Box>
       );

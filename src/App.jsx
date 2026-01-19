@@ -36,6 +36,7 @@ import Terms from "./pages/landing/Terms";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import Profile from "./pages/Profile";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useSelector((state) => state.auth);
@@ -70,13 +71,14 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router 
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
-        <Routes>
+      <ErrorBoundary>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <Routes>
           {/* Public routes */}
           <Route
             path="/"
@@ -161,10 +163,11 @@ function App() {
 
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </ErrorBoundary>
     </ThemeProvider>
-  );
-}
+    );
+  }
 
 export default App;

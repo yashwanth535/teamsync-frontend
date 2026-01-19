@@ -46,14 +46,15 @@ const ProjectsKanban = () => {
     status: "active",
   });
 
-  useEffect(() => {
-    dispatch(fetchProjects());
-  }, [dispatch]);
+  // Don't fetch here - Projects component already fetches
+  // useEffect(() => {
+  //   dispatch(fetchProjects());
+  // }, [dispatch]);
 
   // Filter projects if project param is provided
-  const filteredProjects = projectParam
+  const filteredProjects = projectParam && projects
     ? projects.filter((p) => p._id === projectParam)
-    : projects;
+    : (projects || []);
 
   const statusColumns = {
     active: { title: "Active", color: "#e8f5e9" },
@@ -92,7 +93,7 @@ const ProjectsKanban = () => {
         await dispatch(updateProject({ id: editingProject._id, ...formData })).unwrap();
       }
       handleCloseDialog();
-      dispatch(fetchProjects());
+      // Don't refetch - createProject/updateProject already updates Redux state
     } catch (error) {
       console.error("Error saving project:", error);
     }
@@ -102,7 +103,7 @@ const ProjectsKanban = () => {
     if (window.confirm("Are you sure you want to delete this project?")) {
       try {
         await dispatch(deleteProject(projectId)).unwrap();
-        dispatch(fetchProjects());
+        // Don't refetch - deleteProject already updates Redux state
       } catch (error) {
         console.error("Error deleting project:", error);
       }
@@ -131,7 +132,7 @@ const ProjectsKanban = () => {
             status: destination.droppableId,
           })
         ).unwrap();
-        dispatch(fetchProjects());
+        // Don't refetch - updateProject already updates Redux state
       } catch (error) {
         console.error("Error updating project status:", error);
       }

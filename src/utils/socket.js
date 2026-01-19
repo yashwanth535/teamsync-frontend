@@ -1,13 +1,15 @@
 import { io } from "socket.io-client";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Socket server runs on port 4000
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:4000";
 
 let socket = null;
 
 export const connectSocket = () => {
   if (!socket) {
-    socket = io(API_URL, {
+    socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
+      withCredentials: true,
     });
 
     socket.on("connect", () => {

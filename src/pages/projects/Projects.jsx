@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Box,
@@ -28,6 +28,7 @@ import ProjectsKanban from "./ProjectsKanban";
 
 const Projects = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { projects, loading, error } = useSelector((state) => state.projects);
 
@@ -36,19 +37,24 @@ const Projects = () => {
   const [showKanban, setShowKanban] = useState(true);
 
   useEffect(() => {
-    console.log("Fetching projects...");
-    dispatch(fetchProjects());
-  }, [dispatch]);
+    // Fetch projects when navigating to /projects route
+    if (location.pathname === "/projects" && !loading) {
+      console.log("Fetching projects...");
+      dispatch(fetchProjects());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]); // Re-fetch when route changes to /projects
 
-  const filteredProjects = projects?.filter((project) => {
+  const filteredProjects = (projects || []).filter((project) => {
+    if (!project) return false;
     const matchesSearch = 
-      project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      (project.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (project.description || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
     
     return matchesSearch && matchesStatus;
-  }) || [];
+  });
 
   if (loading) {
     return (
@@ -86,7 +92,7 @@ const Projects = () => {
       </Box>
 
       {/* Kanban Board Section */}
-      {showKanban && projects?.length > 0 && (
+      {showKanban && projects && projects.length > 0 && (
         <Box mb={4}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
             <Typography variant="h5">Projects Kanban</Typography>
