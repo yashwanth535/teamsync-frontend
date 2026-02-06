@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { createTask } from "../../store/slices/taskSlice";
 import { fetchProjects } from "../../store/slices/projectSlice";
-import axios from "../../utils/axios";
+import { fetchTeams } from "../../store/slices/teamSlice";
 
 const CreateTask = () => {
   const navigate = useNavigate();
@@ -27,6 +27,9 @@ const CreateTask = () => {
   const { loading: taskLoading, error: taskError } = useSelector(
     (state) => state.tasks
   );
+  const { teams, loading: teamsLoading } = useSelector(
+    (state) => state.team
+  );
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -36,25 +39,14 @@ const CreateTask = () => {
     project: projectParam || "",
     team: "",
   });
-  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     dispatch(fetchProjects());
-    loadTeams();
+    dispatch(fetchTeams());
     if (projectParam) {
       setFormData(prev => ({ ...prev, project: projectParam }));
     }
   }, [dispatch, projectParam]);
-
-  const loadTeams = async () => {
-    try {
-      const response = await axios.get("/team");
-      setTeams(response.data || []);
-    } catch (error) {
-      console.error("Error loading teams:", error);
-      setTeams([]);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -203,11 +195,17 @@ const CreateTask = () => {
                 }
               >
                 <MenuItem value="">No Team</MenuItem>
-                {teams.map((team) => (
-                  <MenuItem key={team._id} value={team._id}>
-                    {team.name}
+                {teams && teams.length > 0 ? (
+                  teams.map((team) => (
+                    <MenuItem key={team._id} value={team._id}>
+                      {team.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="" disabled>
+                    {teamsLoading ? "Loading teams..." : "No teams available"}
                   </MenuItem>
-                ))}
+                )}
               </TextField>
             </Grid>
             <Grid item xs={12}>
